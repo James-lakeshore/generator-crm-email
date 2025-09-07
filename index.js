@@ -5,6 +5,21 @@ require('dotenv').config();
 const app = express();
 app.use(express.json());
 
+// Optional CORS for browser forms (uncomment if needed)
+// const cors = require('cors');
+// app.use(cors());
+
+// Optional shared-secret protection (only enforced if SECRET_TOKEN is set)
+app.use((req, res, next) => {
+  if (process.env.SECRET_TOKEN && req.path === '/notify') {
+    const sent = req.header('x-secret-token');
+    if (sent !== process.env.SECRET_TOKEN) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    }
+  }
+  next();
+});
+
 // Health check
 app.get('/', (_req, res) => res.send('CRM server OK'));
 
@@ -20,7 +35,7 @@ const transporter = nodemailer.createTransport({
 app.post('/notify', async (req, res) => {
   try {
     const { name = '', email = '', phone = '', message = '' } = req.body || {};
-    const subject = `New Lead ${name ? `from ${name}` : ''}`.trim();
+    const subject = `New Lead${name ? ` from ${name}` : ''}`.trim();
     const text = `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\n\n${message}`;
     await transporter.sendMail({
       from: `"Lakeshore CRM" <${SMTP_USER}>`,
@@ -30,95 +45,10 @@ app.post('/notify', async (req, res) => {
     });
     res.json({ ok: true });
   } catch (err) {
-    console.error('Email error:', err.message);
+    console.error('Email error:', err?.message || err);
     res.status(500).json({ ok: false, error: 'Email failed' });
   }
 });
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`CRM server on port ${PORT}`));
-
-// --- SMTP DEBUG (temporary) ---
-app.get('/debug-smtp', async (_req, res) => {
-  try {
-    await transporter.verify(); // checks host/port/auth with Gmail
-    res.json({ ok: true, message: 'SMTP verified' });
-  } catch (e) {
-    res.status(500).json({
-      ok: false,
-      code: e && e.code,
-      command: e && e.command,
-      responseCode: e && e.responseCode,
-      error: (e && (e.response || e.message || String(e)))
-    });
-  }
-});
-
-// Improve /notify error logging to Render logs
-const layer = app._router?.stack?.find(l => l.route && l.route.path === '/notify');
-if (layer) {
-  const orig = layer.route.stack[0].handle;
-  layer.route.stack[0].handle = async (req, res, next) => {
-    try { await orig(req, res, next); }
-    catch (err) {
-      console.error('Email error details:', {
-        code: err?.code, command: err?.command, responseCode: err?.responseCode, response: err?.response, message: err?.message
-      });
-      throw err;
-    }
-  };
-}
-
-// --- TEMP: show if env vars exist (no secrets printed)
-app.get('/env-check', (_req, res) => {
-  res.json({
-    hasHost: !!process.env.SMTP_HOST,
-    hasPort: !!process.env.SMTP_PORT,
-    hasUser: !!process.env.SMTP_USER,
-    hasPass: !!process.env.SMTP_PASS,
-    hasTo:   !!process.env.TO_EMAIL
-  });
-});
-
-// --- TEMP: verify SMTP credentials with Gmail
-app.get('/debug-smtp', async (_req, res) => {
-  try {
-    await transporter.verify(); // checks host/port/auth
-    res.json({ ok: true, message: 'SMTP verified' });
-  } catch (e) {
-    res.status(500).json({
-      ok: false,
-      code: e?.code,
-      command: e?.command,
-      responseCode: e?.responseCode,
-      error: e?.response || e?.message || String(e)
-    });
-  }
-});
-
-// --- TEMP: show if env vars exist (no secrets printed)
-app.get('/env-check', (_req, res) => {
-  res.json({
-    hasHost: !!process.env.SMTP_HOST,
-    hasPort: !!process.env.SMTP_PORT,
-    hasUser: !!process.env.SMTP_USER,
-    hasPass: !!process.env.SMTP_PASS,
-    hasTo:   !!process.env.TO_EMAIL
-  });
-});
-
-// --- TEMP: verify SMTP credentials with Gmail
-app.get('/debug-smtp', async (_req, res) => {
-  try {
-    await transporter.verify(); // checks host/port/auth with Gmail
-    res.json({ ok: true, message: 'SMTP verified' });
-  } catch (e) {
-    res.status(500).json({
-      ok: false,
-      code: e?.code,
-      command: e?.command,
-      responseCode: e?.responseCode,
-      error: e?.response || e?.message || String(e)
-    });
-  }
-});
