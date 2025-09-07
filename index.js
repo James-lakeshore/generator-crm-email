@@ -37,3 +37,34 @@ app.post('/notify', async (req, res) => {
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`CRM server on port ${PORT}`));
+
+// --- SMTP DEBUG (temporary) ---
+app.get('/debug-smtp', async (_req, res) => {
+  try {
+    await transporter.verify(); // checks host/port/auth with Gmail
+    res.json({ ok: true, message: 'SMTP verified' });
+  } catch (e) {
+    res.status(500).json({
+      ok: false,
+      code: e && e.code,
+      command: e && e.command,
+      responseCode: e && e.responseCode,
+      error: (e && (e.response || e.message || String(e)))
+    });
+  }
+});
+
+// Improve /notify error logging to Render logs
+const layer = app._router?.stack?.find(l => l.route && l.route.path === '/notify');
+if (layer) {
+  const orig = layer.route.stack[0].handle;
+  layer.route.stack[0].handle = async (req, res, next) => {
+    try { await orig(req, res, next); }
+    catch (err) {
+      console.error('Email error details:', {
+        code: err?.code, command: err?.command, responseCode: err?.responseCode, response: err?.response, message: err?.message
+      });
+      throw err;
+    }
+  };
+}
