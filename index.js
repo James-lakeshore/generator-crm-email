@@ -95,3 +95,30 @@ app.get('/debug-smtp', async (_req, res) => {
     });
   }
 });
+
+// --- TEMP: show if env vars exist (no secrets printed)
+app.get('/env-check', (_req, res) => {
+  res.json({
+    hasHost: !!process.env.SMTP_HOST,
+    hasPort: !!process.env.SMTP_PORT,
+    hasUser: !!process.env.SMTP_USER,
+    hasPass: !!process.env.SMTP_PASS,
+    hasTo:   !!process.env.TO_EMAIL
+  });
+});
+
+// --- TEMP: verify SMTP credentials with Gmail
+app.get('/debug-smtp', async (_req, res) => {
+  try {
+    await transporter.verify(); // checks host/port/auth with Gmail
+    res.json({ ok: true, message: 'SMTP verified' });
+  } catch (e) {
+    res.status(500).json({
+      ok: false,
+      code: e?.code,
+      command: e?.command,
+      responseCode: e?.responseCode,
+      error: e?.response || e?.message || String(e)
+    });
+  }
+});
