@@ -55,3 +55,10 @@ app.use('/notify', rateLimit({
   standardHeaders: true,
   legacyHeaders: false
 }));
+const rateLimit = require('express-rate-limit');
+app.use('/notify', rateLimit({
+  windowMs: 60 * 1000,  // 1 minute
+  max: 10,              // 10 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false
+}));
