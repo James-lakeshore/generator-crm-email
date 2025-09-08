@@ -5,11 +5,7 @@ require('dotenv').config();
 const app = express();
 app.use(express.json());
 
-// Optional CORS for browser forms (uncomment if needed)
-// const cors = require('cors');
-// app.use(cors());
-
-// Optional shared-secret protection (only enforced if SECRET_TOKEN is set)
+// Optional shared-secret: only enforce if SECRET_TOKEN is set
 app.use((req, res, next) => {
   if (process.env.SECRET_TOKEN && req.path === '/notify') {
     const sent = req.header('x-secret-token');
@@ -52,3 +48,10 @@ app.post('/notify', async (req, res) => {
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`CRM server on port ${PORT}`));
+const rateLimit = require('express-rate-limit');
+app.use('/notify', rateLimit({
+  windowMs: 60 * 1000,   // 1 minute
+  max: 10,               // 10 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false
+}));
