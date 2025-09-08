@@ -76,3 +76,36 @@ try {
 } catch (e) {
   console.log('Rate limit not applied:', e && e.message);
 }
+
+// --- Tally payload normalizer for /notify ---
+function normalizeTallyPayload(body) {
+  if (body && body.data && Array.isArray(body.data.fields)) {
+    const fields = body.data.fields;
+    const pick = (...labels) => {
+      const lower = labels.map(l => String(l).toLowerCase());
+      const hit = fields.find(f => lower.includes(String(f.label || '').toLowerCase()));
+      return hit?.value ?? '';
+    };
+    const name = pick('Name', 'Full name');
+    const email = pick('Email');
+    const phone = pick('Phone', 'Phone number');
+    const message = pick('Message', 'Long text', 'Comments', 'Notes', 'Inquiry');
+    return { name, email, phone, message };
+  }
+  return null;
+}
+
+// Wrap the existing /notify handler so we can rewrite req.body if it's a Tally webhook
+const notifyLayer = app._router?.stack?.find(l => l.route && l.route.path === '/notify');
+if (notifyLayer) {
+  const original = notifyLayer.route.stack[0].handle;
+  notifyLayer.route.stack[0].handle = async (req, res, next) => {
+    try {
+      if (req.method === 'POST' && req.is('application/json')) {
+        const norm = normalizeTallyPayload(req.body);
+        if (norm) req.body = norm;  // now your existing handler sees {name,email,phone,message}
+      }
+    } catch {}
+    return original(req, res, next);
+  };
+}
