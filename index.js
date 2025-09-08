@@ -62,3 +62,17 @@ app.use('/notify', rateLimit({
   standardHeaders: true,
   legacyHeaders: false
 }));
+
+// --- Rate limit /notify (protect against bursts) ---
+try {
+  const rateLimit = require('express-rate-limit');
+  app.use('/notify', rateLimit({
+    windowMs: 60 * 1000,   // 1 minute
+    max: 10,               // 10 requests per minute per IP
+    standardHeaders: true,
+    legacyHeaders: false
+  }));
+  console.log('Rate limit enabled on /notify');
+} catch (e) {
+  console.log('Rate limit not applied:', e && e.message);
+}
